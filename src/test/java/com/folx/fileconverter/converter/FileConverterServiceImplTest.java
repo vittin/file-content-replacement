@@ -21,16 +21,16 @@ import static org.junit.Assert.assertThat;
 
 public class FileConverterServiceImplTest {
 
-    FileConverterService fileConverterService;
-    Path filesDirPath;
-    
+    private static Path filesDirPath;
     private static Map<String, File> expectedFiles;
-    Map<String, File> returnedFiles;
+    private Map<String, File> returnedFiles;
+    private FileConverterService fileConverterService;
 
     @BeforeClass
-    public static void setUpAll() throws Exception {
+    public static void setUpClass() throws Exception {
         FileUtils.copyDirectory(new ClassPathResource("/ro").getFile(), new ClassPathResource("/rw").getFile());
         expectedFiles = getFiles("/expected");
+        filesDirPath = new ClassPathResource("/rw").getFile().toPath();
     }
 
     @Before
@@ -41,7 +41,7 @@ public class FileConverterServiceImplTest {
     @Test
     public void given_extension_when_convert_shouldConvertFilesWithExtension() throws Exception {
 
-        fileConverterService.replaceText(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
+        fileConverterService.replaceContent(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
         returnedFiles = getFiles("/rw");
 
         assertThat(bytesOf(returnedFiles.get("lorem.txt")), is(not(nullValue())));
@@ -53,7 +53,7 @@ public class FileConverterServiceImplTest {
     @Test
     public void given_extension_when_convert_shouldNotConvertFilesWithDifferentExtension() {
 
-        fileConverterService.replaceText(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
+        fileConverterService.replaceContent(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
         returnedFiles = getFiles("/rw");
 
         assertThat(bytesOf(returnedFiles.get("lorem.not-txt")), is(not(nullValue())));
@@ -62,27 +62,38 @@ public class FileConverterServiceImplTest {
 
     @Test
     public void given_path_when_convert_shouldRecursiveChangeAllFiles() {
-        fileConverterService.replaceText(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
+        fileConverterService.replaceContent(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
         returnedFiles = getFiles("/rw");
 
         assertThat(bytesOf(returnedFiles.get("also-lorem.txt")), is(not(nullValue())));
         assertThat(bytesOf(returnedFiles.get("also-lorem.txt")), is(equalTo(bytesOf(expectedFiles.get("also-lorem.txt")))));
-        assertThat(bytesOf(returnedFiles.get("also-lorem-inside.txt")), is(not(nullValue())));
-        assertThat(bytesOf(returnedFiles.get("also-lorem-inside.txt")), is((equalTo(bytesOf(expectedFiles.get("also-lorem.txt"))))));
+        assertThat(bytesOf(returnedFiles.get("lorem-inside.txt")), is(not(nullValue())));
+        assertThat(bytesOf(returnedFiles.get("lorem-inside.txt")), is((equalTo(bytesOf(expectedFiles.get("lorem-inside.txt"))))));
 
     }
 
     @Test
     public void given_subdirs_when_convert_should_CheckAllFiles() {
-        fileConverterService.replaceText(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
+        fileConverterService.replaceContent(filesDirPath, "txt", "Lorem ipsum".getBytes(), "Folx rulez".getBytes());
         returnedFiles = getFiles("/rw");
 
-        assertThat(returnedFiles.values(), is(contains(expectedFiles.values())));
+        assertThat(returnedFiles.keySet(), hasSize(6));
+    }
+
+    @Test
+    public void shouldConvertBinaryFilesToo() {
+        fileConverterService.replaceContent(filesDirPath, "png", "�\u0003�x���E�lKD�".getBytes(), "Folx rulez".getBytes());
+
+        returnedFiles = getFiles("/rw");
+
+        assertThat(returnedFiles.keySet(), is(not(empty())));
+        assertThat(returnedFiles.get("lorem.png"), is(not(nullValue())));
+        assertThat(new String(bytesOf(returnedFiles.get("lorem.png"))), containsString("Folx rulez"));
     }
 
     private static Map<String, File> getFiles(String path) {
         Map<String, File> files = new HashMap<>();
-        Arrays.asList("lorem.txt",
+        Arrays.asList(path + "/lorem.txt",
                 path + "/lorem.not-txt",
                 path + "/subdir/also-lorem.txt",
                 path + "/subdir/not-lorem.txt",
